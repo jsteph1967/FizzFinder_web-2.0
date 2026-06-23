@@ -1,0 +1,6 @@
+{
+  "appId": "com.fizzfinder.app",
+  "appName": "FizzFinder",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

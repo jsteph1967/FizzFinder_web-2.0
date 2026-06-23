@@ -1,0 +1,6 @@
+{
+  "name": "FizzFinder",
+  "description": "Crowdsourced locator for hard-to-find soda and specialty beverage flavors.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

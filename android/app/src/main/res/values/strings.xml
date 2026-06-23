@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FizzFinder</string>
+    <string name="title_activity_main">FizzFinder</string>
+    <string name="package_name">com.fizzfinder.app</string>
+    <string name="custom_url_scheme">com.fizzfinder.app</string>
+</resources>

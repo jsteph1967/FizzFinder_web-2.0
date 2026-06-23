@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "SodaSpotting": {
+      "title": "SodaSpotting",
+      "description": "A specific location sighting/spotting of a specialty soda flavor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique identifier of the spotting" },
+        "flavorId": { "type": "string", "description": "The ID of the soda flavor spotted" },
+        "flavorName": { "type": "string", "description": "Name of the spotted flavor" },
+        "brand": { "type": "string", "description": "Brand of the flavor" },
+        "category": { "type": "string", "enum": ["Soda", "Energy Drink", "Tea/Juice", "Rare Import", "Seltzer"] },
+        "storeName": { "type": "string", "description": "Name of the retail store" },
+        "storeAddress": { "type": "string", "description": "Human readable address of the store" },
+        "latitude": { "type": "number", "description": "Latitude coordinate" },
+        "longitude": { "type": "number", "description": "Longitude coordinate" },
+        "stockLevel": { "type": "string", "enum": ["Full Shelf", "High", "Medium", "Low", "Out of Stock"] },
+        "price": { "type": "number", "description": "Optional retail price of the flavor" },
+        "size": { "type": "string", "description": "Packaging size representation" },
+        "reportedBy": { "type": "string", "description": "Username of reviewer" },
+        "reportedByReputation": { "type": "integer", "description": "Reputation points" },
+        "reportedTime": { "type": "string", "description": "Relative reported time string" },
+        "confirmations": { "type": "integer", "default": 0 },
+        "denials": { "type": "integer", "default": 0 },
+        "storeRating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "flavorId", "flavorName", "brand", "category", "storeName", "storeAddress", "latitude", "longitude", "stockLevel", "size", "reportedBy", "reportedByReputation", "confirmations", "denials", "storeRating"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "User feedback or status verification comment on a spotting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "userReputation": { "type": "integer" },
+        "text": { "type": "string" },
+        "time": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "userReputation", "text", "time"]
+    },
+    "SodaFlavor": {
+      "title": "SodaFlavor",
+      "description": "A catalogued specialty soda flavor definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "category": { "type": "string", "enum": ["Soda", "Energy Drink", "Tea/Juice", "Rare Import", "Seltzer"] },
+        "rarityScore": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "brand", "category", "rarityScore", "description"]
+    },
+    "UserFinder": {
+      "title": "UserFinder",
+      "description": "A user profile record and reputation rank tracking",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "reputationPoints": { "type": "integer" },
+        "contributionsCount": { "type": "integer" },
+        "accuracyRate": { "type": "number" },
+        "badge": { "type": "string", "enum": ["Sip Master", "Carbonation King", "Nectar Hunter", "Flavor Scout", "Fizz Cadet"] },
+        "avatarColor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "username", "reputationPoints", "contributionsCount", "accuracyRate", "badge", "avatarColor"]
+    }
+  },
+  "firestore": {
+    "/spottings/{spottingId}": {
+      "schema": "SodaSpotting",
+      "description": "Active soda spotting listings"
+    },
+    "/spottings/{spottingId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Thread of reviews/comments on a specific spotting"
+    },
+    "/flavors/{flavorId}": {
+      "schema": "SodaFlavor",
+      "description": "Catalog of all flavors including custom user-reported flavors"
+    },
+    "/users/{userId}": {
+      "schema": "UserFinder",
+      "description": "User profiles tracking points, rankings & stats"
+    }
+  }
+}

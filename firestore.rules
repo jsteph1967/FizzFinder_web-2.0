@@ -1,0 +1,177 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Catch-All Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- PHASE 3 REUSABLE GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == "jsteph1967@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- ENTITY-SPECIFIC VALIDATORS ---
+
+    function isValidSpotting(data) {
+      return data.keys().hasAll([
+        'id', 'flavorId', 'flavorName', 'brand', 'category', 'storeName', 
+        'storeAddress', 'latitude', 'longitude', 'stockLevel', 'size', 
+        'reportedBy', 'reportedByReputation', 'confirmations', 'denials', 'storeRating'
+      ])
+      && data.id is string && data.id.size() <= 128
+      && data.flavorId is string && data.flavorId.size() <= 128
+      && data.flavorName is string && data.flavorName.size() <= 150
+      && data.brand is string && data.brand.size() <= 150
+      && data.category in ['Soda', 'Energy Drink', 'Tea/Juice', 'Rare Import', 'Seltzer']
+      && data.storeName is string && data.storeName.size() <= 150
+      && data.storeAddress is string && data.storeAddress.size() <= 200
+      && data.latitude is number && data.longitude is number
+      && data.stockLevel in ['Full Shelf', 'High', 'Medium', 'Low', 'Out of Stock']
+      && data.size is string && data.size.size() <= 50
+      && data.reportedBy is string && data.reportedBy.size() <= 100
+      && data.reportedByReputation is int
+      && data.confirmations is int && data.confirmations >= 0
+      && data.denials is int && data.denials >= 0
+      && data.storeRating is number && data.storeRating >= 1.0 && data.storeRating <= 5.0;
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['id', 'username', 'userReputation', 'text', 'time'])
+      && data.id is string && data.id.size() <= 128
+      && data.username is string && data.username.size() <= 100
+      && data.userReputation is int
+      && data.text is string && data.text.size() <= 500
+      && data.time is string && data.time.size() <= 50;
+    }
+
+    function isValidFlavor(data) {
+      return data.keys().hasAll(['id', 'name', 'brand', 'category', 'rarityScore', 'description'])
+      && data.id is string && data.id.size() <= 128
+      && data.name is string && data.name.size() <= 150
+      && data.brand is string && data.brand.size() <= 150
+      && data.category in ['Soda', 'Energy Drink', 'Tea/Juice', 'Rare Import', 'Seltzer']
+      && data.rarityScore is int && data.rarityScore >= 1 && data.rarityScore <= 10
+      && data.description is string && data.description.size() <= 1000;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'username', 'reputationPoints', 'contributionsCount', 'accuracyRate', 'badge', 'avatarColor'])
+      && data.userId is string && data.userId.size() <= 128
+      && data.username is string && data.username.size() <= 100
+      && data.reputationPoints is int
+      && data.contributionsCount is int
+      && data.accuracyRate is number && data.accuracyRate >= 0 && data.accuracyRate <= 100
+      && data.badge in ['Sip Master', 'Carbonation King', 'Nectar Hunter', 'Flavor Scout', 'Fizz Cadet']
+      && data.avatarColor is string && data.avatarColor.size() <= 150;
+    }
+
+    // --- COLLECTION MATCHES ---
+
+    // 1. Spottings Collection
+    match /spottings/{spottingId} {
+      allow read: if true; // Public catalogs are readable by everyone
+
+      allow create: if (isVerified() 
+        && isValidId(spottingId)
+        && isValidSpotting(incoming())
+        && incoming().id == spottingId
+        && incoming().confirmations == 1
+        && incoming().denials == 0) || isAdmin();
+
+      // Tiered Action updates:
+      // - Vote (increase confirmation or denial)
+      // - Edit stock level
+      allow update: if (isVerified()
+        && isValidId(spottingId)
+        && isValidSpotting(incoming())
+        // Immutable check
+        && incoming().id == existing().id
+        && incoming().flavorId == existing().flavorId
+        && incoming().reportedBy == existing().reportedBy
+        && (
+          // Action: Confirm or Deny Vote (updates confirmations, denials, etc.)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['confirmations', 'denials']))
+          // Action: Update stock level & optionally storeRating / price / size
+          || (incoming().diff(existing()).affectedKeys().hasAll(['stockLevel']) 
+              && incoming().diff(existing()).affectedKeys().hasOnly(['stockLevel', 'storeRating', 'price', 'size']))
+        )) || isAdmin();
+
+      allow delete: if isAdmin(); // Allow admin deletion
+
+      // 2. nested comments subcollection within spottings
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if (isVerified()
+          && isValidId(commentId)
+          && isValidComment(incoming())
+          && incoming().id == commentId
+          // Relationship mapping: verify spotting document exists
+          && exists(/databases/$(database)/documents/spottings/$(spottingId))) || isAdmin();
+
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // 3. Flavors Collection (catalog of soda types)
+    match /flavors/{flavorId} {
+      allow read: if true;
+
+      allow create: if (isVerified()
+        && isValidId(flavorId)
+        && isValidFlavor(incoming())
+        && incoming().id == flavorId) || isAdmin();
+
+      allow update, delete: if isAdmin(); // Admin can manage catalogs
+    }
+
+    // 4. Users Collection (leaderboard profiles)
+    match /users/{userId} {
+      allow read: if true;
+
+      // A user can create their own profile, initializing base stats safely
+      allow create: if (isVerified()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUser(incoming())
+        && incoming().userId == userId
+        && incoming().reputationPoints >= 0 && incoming().reputationPoints <= 120
+        && incoming().contributionsCount == 1
+        && incoming().accuracyRate == 100) || isAdmin();
+
+      // Users or system updates profile scores on confirmation/denial
+      allow update: if (isVerified()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().userId == existing().userId
+        && incoming().username == existing().username
+        // Limit updates exclusively to score metrics and badge/color updates
+        && incoming().diff(existing()).affectedKeys().hasOnly(['reputationPoints', 'contributionsCount', 'accuracyRate', 'badge', 'avatarColor'])) || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+  }
+}
